@@ -34,7 +34,7 @@ int run_child( char *cmd, int len)
     memset(argv, 0, sizeof(argv));
     split_str( cmd, len, argv, ARGS_MAX); 
     //printf("running :%s:\n", argv[0]);
-    if( execv(argv[0], argv) < 0 )  {
+    if( execvp(argv[0], argv) < 0 )  {
     //if( execv("/bin/date", argv) < 0 )  {
         printf("Error %s for cmd %s\n", strerror(errno), argv[0]);
     }
