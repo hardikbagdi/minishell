@@ -6,10 +6,18 @@
 #include <unistd.h>
 #include <errno.h>
 
-#define INP_SIZE_MAX    1024
-#define ARGS_MAX 100
-char inp[INP_SIZE_MAX];
+#define INP_SIZE_MAX    1024 //max chars in a cmd
+#define ARGS_MAX 10	// max args per cmd
+#define CHILD_PER_CMD_MAX 100	//max number of cmds in a pipe
 
+char inp[INP_SIZE_MAX]; //cmd line
+char *inp_tokens[CHILD_PER_CMD_MAX * ARGS_MAX]; // token list of entire command line
+struct child_process {
+	char cmd_start_index; // index of the first token for this cmd in cmd line
+	char cmd_len;	//number of command line arguments for this process( including cmd name)
+	pid_t pid;	//pid of this child
+} child_list[CHILD_PER_CMD_MAX];	// a cmd line can have at most
+ 
 int split_str( char *line, unsigned int line_len, char **tok_list, unsigned int tok_list_len)
 {
     int i = 0;
@@ -28,6 +36,7 @@ int split_str( char *line, unsigned int line_len, char **tok_list, unsigned int 
             
 }                
 
+int parse_cmd_line( char *cmd, int len)
 int run_child( char *cmd, int len)
 {
     char *argv[ARGS_MAX];
@@ -50,7 +59,9 @@ int main(void)
     while(1)    {
         printf("msh>");
         fgets(inp, INP_SIZE_MAX, stdin);
-        pid = fork();
+       	//tokanise the cmd line input
+    	split_str( inp, sizeof(inp), inp_tokens, sizeof(inp_tokens)); 
+	pid = fork();
         if( pid < 0 )   {
             printf(" ERROR creating child\n");
             exit(0);
