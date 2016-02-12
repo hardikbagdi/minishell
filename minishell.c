@@ -78,9 +78,9 @@ int main(void)
         fgets(inp, INP_SIZE_MAX, stdin);
        	//tokanise the cmd line input
     	split_str( inp, sizeof(inp), inp_tokens, sizeof(inp_tokens)); 
-	//fillout child process array
-	fill_child_list();	
-	pid = fork();
+	    //fillout child process array
+	    fill_child_list();	
+	    pid = fork();
         if( pid < 0 )   {
             printf(" ERROR creating child\n");
             exit(0);
