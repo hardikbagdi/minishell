@@ -17,7 +17,8 @@ struct child_process {
 	char cmd_len;	//number of command line arguments for this process( including cmd name)
 	pid_t pid;	//pid of this child
 } child_list[CHILD_PER_CMD_MAX];	// a cmd line can have at most
- 
+int num_childs;	// total number of child processes in this command 
+
 int split_str( char *line, unsigned int line_len, char **tok_list, unsigned int tok_list_len)
 {
     int i = 0;
@@ -36,7 +37,6 @@ int split_str( char *line, unsigned int line_len, char **tok_list, unsigned int 
             
 }                
 
-int parse_cmd_line( char *cmd, int len)
 int run_child( char *cmd, int len)
 {
     char *argv[ARGS_MAX];
@@ -50,6 +50,23 @@ int run_child( char *cmd, int len)
     return 0;
 }
 
+int fill_child_list( void )
+{
+    int i = 0;
+    int j = 0;
+    child_list[j].cmd_start_index = 0;
+    child_list[j].cmd_len = 1;
+    for( i = 1; inp_tokens[i] != NULL; i++) {
+        if( *inp_tokens[i] == '|')  {
+            j++;
+            child_list[j].cmd_start_index = i + 1;
+        }else   {
+            child_list[j].cmd_len++;
+        }
+    }
+
+	return 0;	
+}
 
 int main(void)
 {
@@ -61,6 +78,8 @@ int main(void)
         fgets(inp, INP_SIZE_MAX, stdin);
        	//tokanise the cmd line input
     	split_str( inp, sizeof(inp), inp_tokens, sizeof(inp_tokens)); 
+	//fillout child process array
+	fill_child_list();	
 	pid = fork();
         if( pid < 0 )   {
             printf(" ERROR creating child\n");
