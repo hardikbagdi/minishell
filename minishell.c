@@ -64,7 +64,7 @@ int fill_child_list( void )
             child_list[j].cmd_len++;
         }
     }
-
+    num_childs = j+1;
 	return 0;	
 }
 
