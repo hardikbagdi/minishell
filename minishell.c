@@ -65,7 +65,7 @@ int fill_child_list( void )
         }
     }
     num_childs = j+1;
-	return 0;	
+    return 0;	
 }
 
 int main(void)
