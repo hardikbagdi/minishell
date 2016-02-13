@@ -40,7 +40,7 @@ int split_str( char *line, unsigned int line_len, char **tok_list, unsigned int 
     while( (i < tok_list_len) &&  (tok_list[i] != NULL))  {
             tok_list[++i] = strtok(NULL, " ");
     }
-            
+     
 }                
 
 int run_child( char *cmd, int len)
@@ -63,16 +63,17 @@ int fill_child_list( void )
     child_list[j].cmd_start_index = 0;
     child_list[j].cmd_len = 1;
     for( i = 1; inp_tokens[i] != NULL; i++) {
+        printf("found token :%s:\n", inp_tokens[i]);
         if( *inp_tokens[i] == '|')  {
             j++;
             child_list[j].cmd_start_index = i + 1;
-            child_list[j].cmd_len = 1;
+           // child_list[j].cmd_len = 1;
         }else   {
             child_list[j].cmd_len++;
         }
     }
     num_childs = j+1;
-    printf("total number of childs = %d",num_childs);
+    printf("total number of childs = %d\n",num_childs);
     return 0;	
 }
 
@@ -86,21 +87,27 @@ int run_exec(void)
     int out_fd;
     char* in_file = NULL;
     char* out_file = NULL;
-    
+   printf(" exec for child %d\n", current_child); 
+    //printf(" exec for child --"); 
     memset(argv, 0 , sizeof(argv)); //check this 
-    for( i = child_list[current_child].cmd_start_index; i <child_list[current_child].cmd_len; i++)  {
+    printf("exec for child %d, cmd_start_index = %d, cmd len = %d\n", current_child, child_list[current_child].cmd_start_index, child_list[current_child].cmd_len);
+    for( i = child_list[current_child].cmd_start_index; i < ( child_list[current_child].cmd_start_index + child_list[current_child].cmd_len); i++)  {
+    //for( i = child_list[current_child].cmd_start_index; inp_tokens[i] != NULL;  i++)  {
         if(*inp_tokens[i] == '>')    {
             out_file = inp_tokens[i + 1];
             i++;    //skip the next token because it is a fine name
         }   
-        if(*inp_tokens[i] == '<')   { 
+        else if(*inp_tokens[i] == '<')   { 
             in_file = inp_tokens[i + 1];   
             i++;    //skip the next token because it is a fine name
         }
         else    {
             argv[j++] = inp_tokens[i];
+            printf("inp_tokens[%d] = %s \n",i,  inp_tokens[i]);
         }
+        printf("1HERE \n");
     }
+    printf("HERE \n");
     if( in_file != NULL )   {
        if( open(in_file, O_RDONLY ) < 0 )   {
             printf("Error %s for cmd %s, file %s\n", strerror(errno), argv[0], in_file);
@@ -114,17 +121,27 @@ int run_exec(void)
     }
 
     if( out_file != NULL )   {
-       if( open(out_file, O_CREAT|O_WRONLY|O_TRUNC ) < 0 )   {
+       if( open(out_file, O_CREAT|O_WRONLY|O_TRUNC , 0600) < 0 )   {
             printf("Error %s for cmd %s, file %s\n", strerror(errno), argv[0], out_file);
             return 1;   
        }
-        if( dup2(out_fd, STDOUT_FILENO) < 0)   {
+       
+       fsync(1);
+        if( dup2(out_fd, 1) < 0)   {
             printf("Error in dup %s for cmd %s, file %s\n", strerror(errno), argv[0], in_file);
             return 1;   
        }
+       fsync(out_fd);
        close(out_fd);
     }
 
+    printf("Running:\n");
+    int k = 0;
+    while( argv[k] != NULL ){
+        printf("%s ", argv[k]);
+        k++;
+    }
+    printf("\n");
 
     if( execvp(argv[0], argv) < 0 )  {
         printf("Error %s for cmd %s\n", strerror(errno), argv[0]);
@@ -135,18 +152,21 @@ int spawn_child( void )
 {
     pid_t pid;
 
-    current_child++;
-    printf("current child = %d", current_child);
+//    current_child++;
+    printf("current child = %d\n", current_child);
     pid = fork();
     if( pid < 0 )   {
         printf("Error1 %s \n", strerror(errno));
         exit(1);
     }
     if( pid == 0 )  {   //child
+        current_child++;
         if( current_child < (num_childs - 1))   { // there are more commands in pipe, spawn recursively
+            printf("spawning recursive child. cur child = %d\n", current_child);
+          // current_child++;
             spawn_child();
         } else{             // last cmd in pipe
-            printf("last command, %d", current_child);
+            printf("last command, %d\n", current_child);
             run_exec();
         }
     }
@@ -155,6 +175,8 @@ int spawn_child( void )
             wait(NULL); //shell does not exec itself
         }
         else    {
+           // sleep(1);
+            printf("runnig exec for child  %d\n", current_child);
             run_exec(); // this is a child
         }
     }
@@ -184,7 +206,14 @@ int main(void)
     	split_str( inp, sizeof(inp), inp_tokens, sizeof(inp_tokens)); 
 	    //fillout child process array
 	    fill_child_list();
-        spawn_child();    
+        spawn_child();   
+        memset( inp_tokens, 0, sizeof(inp_tokens));
+        memset( inp, 0, sizeof(inp));
+
+        memset( child_list, 0, sizeof(child_list));
+        num_childs = 0;
+
+        current_child = -1;  //index to the child_list[]
 /*
         pid = fork();
         if( pid < 0 )   {
