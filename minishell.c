@@ -108,12 +108,13 @@ int run_exec(void)
         printf("1HERE \n");
     }
     printf("HERE \n");
-    if( in_file != NULL )   {
-       if( open(in_file, O_RDONLY ) < 0 )   {
+    if( in_file != NULL )   { 
+       in_fd = open(in_file, O_RDONLY );
+       if( in_fd  < 0 )   {
             printf("Error %s for cmd %s, file %s\n", strerror(errno), argv[0], in_file);
             return 1;   
        }
-       if( dup2(in_fd, STDIN_FILENO) < 0)   {
+       if( dup2(in_fd,  fileno(stdin)) < 0)   {
             printf("Error in dup %s for cmd %s, file %s\n", strerror(errno), argv[0], in_file);
             return 1;   
        }
@@ -121,18 +122,17 @@ int run_exec(void)
     }
 
     if( out_file != NULL )   {
-       if( open(out_file, O_CREAT|O_WRONLY|O_TRUNC , 0600) < 0 )   {
+       out_fd = open(out_file, O_CREAT|O_WRONLY|O_TRUNC , 0600);
+       if(  out_fd  < 0 )   {
             printf("Error %s for cmd %s, file %s\n", strerror(errno), argv[0], out_file);
             return 1;   
        }
-       
-       fsync(1);
-        if( dup2(out_fd, 1) < 0)   {
+       if( dup2(out_fd, fileno(stdout)) < 0)   {
             printf("Error in dup %s for cmd %s, file %s\n", strerror(errno), argv[0], in_file);
             return 1;   
        }
-       fsync(out_fd);
        close(out_fd);
+      //fprintf(stderr, "OUTPUT!!!!\n");
     }
 
     printf("Running:\n");
