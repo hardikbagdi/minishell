@@ -106,6 +106,7 @@ int removejob(pid_t pid_to_remove){
     }
     prev->next = curr->next;
     --no_of_jobs;
+    free(curr->cmd);
     free(curr);
     return 0;
 
@@ -165,7 +166,8 @@ int check_if_background(char* inp){
     char *argv[ARGS_MAX];
     char *inp_copy = calloc(strlen(inp),1);
     memcpy(inp_copy,inp,strlen(inp));
-    split_str( inp_copy, INP_SIZE_MAX, argv, ARGS_MAX); 
+    split_str( inp_copy, INP_SIZE_MAX, argv, ARGS_MAX);
+    free(inp_copy);
     int len = length(argv);
     if(strcmp(argv[len-1],background_operator)==0){
         // printf("background requested yes\n");fflush(stdout);
@@ -278,7 +280,8 @@ int check_and_handle_bash_cmd(char* inp){
     char *argv[ARGS_MAX];
     char *inp_copy = calloc(strlen(inp),1);
     memcpy(inp_copy,inp,strlen(inp));
-    split_str( inp_copy, INP_SIZE_MAX, argv, ARGS_MAX);    
+    split_str( inp_copy, INP_SIZE_MAX, argv, ARGS_MAX);
+    free(inp_copy);    
     if(argv[0] == NULL)
         return 0;
     else{
