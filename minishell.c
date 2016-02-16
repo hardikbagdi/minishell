@@ -238,23 +238,7 @@ int spawn_child_itrative( int child )
 {
     pid_t pid;
     int fds[2]; //For Input and Output redir
-//    current_child++;
     printf("Itrative: child = %d\n", child);
-    // if thre is a pipe
-    /*
-    if( num_childs > 1 )    {
-        
-        printf("creating pipe in  = %d\n", current_child);
-        create_pipe(fds);
-        //     and if current child is not the last one in the pipe, create out pipe
-        if( current_child < (num_childs -1))    {
-            open_write_end(fds);
-        }
-        if(  current_child > 0 )    {
-            open_read_end(fds);
-        }
-   }
-      */  
     pid = fork();
     if( pid < 0 )   {
         printf("Error1 %s \n", strerror(errno));
@@ -268,32 +252,8 @@ int spawn_child_itrative( int child )
         if(child_list[current_child].pipe_out == TRUE ){
             open_write_end( child_list[current_child].fds);
         }
-
-
-        /*
-        if( current_child < (num_childs - 1))   { // there are more commands in pipe, spawn recursively
-            printf("spawning recursive child. cur child = %d\n", current_child);
-          // current_child++;
-            spawn_child();
-        } else{             // last cmd in pipe
-            printf("last command, %d\n", current_child);
-        */
-            run_exec();
-        /*
-        }
-        */
-    }/*
-    else    {   //parent
-        if( this_is_shell())    {
-            wait(NULL); //shell does not exec itself
-        }
-        else    {
-           // sleep(1);
-            printf("runnig exec for child  %d\n", current_child);
-            run_exec(); // this is a child
-        }
-    }
-    */
+       run_exec();
+    }    
     return 0;
 }
 
@@ -340,11 +300,6 @@ int main(void)
 
         } 
         for( i = 0; i < num_childs; i++)    {
-            //printf(" child finished %d\n", wait(NULL));
-            //close(child_list[i].fds[0]);
-            //close(child_list[i].fds[1]);
-        } 
-        for( i = 0; i < num_childs; i++)    {
             printf(" child finished %d\n", wait(NULL));
         }
         memset( inp_tokens, 0, sizeof(inp_tokens));
@@ -354,22 +309,6 @@ int main(void)
         num_childs = 0;
 
         current_child = -1;  //index to the child_list[]
-/*
-        pid = fork();
-        if( pid < 0 )   {
-            printf(" ERROR creating child\n");
-            exit(0);
-        }
-        if( pid == 0 )   {
-            run_child(inp, INP_SIZE_MAX);
-        }
-        else    {   //this is parent
-            //printf("parent waiting\n");
-            waitpid(pid, &child_status, WUNTRACED | WCONTINUED);
-            //printf("child done\n");
-        }
-*/
-        //printf("%s",inp);
     }
 	return 0;
 }
