@@ -20,7 +20,11 @@ struct child_process {
 	char cmd_start_index; // index of the first token for this cmd in cmd line
 	char cmd_len;	//number of command line arguments for this process( including cmd name)
 	pid_t pid;	//pid of this child
+    int pipe_out;
+    int pipe_in;
+    int fds[2];
 } child_list[CHILD_PER_CMD_MAX];	// a cmd line can have at most
+
 int num_childs;	// total number of child processes in this command 
 
 pid_t shell_pid;    //Pid of shell
@@ -87,7 +91,8 @@ int run_exec(void)
     int out_fd;
     char* in_file = NULL;
     char* out_file = NULL;
-   printf(" exec for child %d\n", current_child); 
+    
+    //printf(" exec for child %d\n", current_child); 
     //printf(" exec for child --"); 
     memset(argv, 0 , sizeof(argv)); //check this 
     printf("exec for child %d, cmd_start_index = %d, cmd len = %d\n", current_child, child_list[current_child].cmd_start_index, child_list[current_child].cmd_len);
@@ -105,9 +110,9 @@ int run_exec(void)
             argv[j++] = inp_tokens[i];
             printf("inp_tokens[%d] = %s \n",i,  inp_tokens[i]);
         }
-        printf("1HERE \n");
+       // printf("1HERE \n");
     }
-    printf("HERE \n");
+    //printf("HERE \n");
     if( in_file != NULL )   { 
        in_fd = open(in_file, O_RDONLY );
        if( in_fd  < 0 )   {
@@ -232,7 +237,7 @@ int spawn_child_itrative( int child )
     pid_t pid;
     int fds[2]; //For Input and Output redir
 //    current_child++;
-    printf("Itrative: current child = %d\n", current_child);
+    printf("Itrative: child = %d\n", child);
     // if thre is a pipe
     /*
     if( num_childs > 1 )    {
@@ -255,6 +260,14 @@ int spawn_child_itrative( int child )
     }
     if( pid == 0 )  {   //child
         current_child = child;
+        if(child_list[current_child].pipe_in == TRUE ){
+            open_read_end( child_list[current_child - 1].fds);
+        }
+        if(child_list[current_child].pipe_out == TRUE ){
+            open_write_end( child_list[current_child].fds);
+        }
+
+
         /*
         if( current_child < (num_childs - 1))   { // there are more commands in pipe, spawn recursively
             printf("spawning recursive child. cur child = %d\n", current_child);
@@ -308,12 +321,25 @@ int main(void)
 	    fill_child_list();
         // spawn_child();   // recursive 
         for( i = 0; i < num_childs; i++)    {
+            if( num_childs > 1) {
+                if( i < (num_childs -1)) {
+                    child_list[i].pipe_out = TRUE;
+                    create_pipe( child_list[i].fds );
+                }
+                if( i > 0 ){
+                    child_list[i].pipe_in = TRUE;
+                }
+            }               
             spawn_child_itrative(i);
         } 
         for( i = 0; i < num_childs; i++)    {
-            wait(NULL);
+            //printf(" child finished %d\n", wait(NULL));
+            //close(child_list[i].fds[0]);
+            //close(child_list[i].fds[1]);
         } 
-
+        for( i = 0; i < num_childs; i++)    {
+            printf(" child finished %d\n", wait(NULL));
+        }
         memset( inp_tokens, 0, sizeof(inp_tokens));
         memset( inp, 0, sizeof(inp));
 
