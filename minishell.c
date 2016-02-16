@@ -148,12 +148,57 @@ int run_exec(void)
     }
     return 0;
 }
+
+int create_pipe( int *fds)
+{
+    if ( pipe(fds) == -1) {
+        printf("Pipe error %s, for child %d \n", strerror(errno), current_child);
+        exit(1);
+    }
+   return 0;
+}
+
+int open_write_end(int *fds)
+{
+    close(1);  /* close normal stdout (fd = 1) */
+    if( dup2(fds[1], 1)) {    /* make stdout same as fds[1] */
+        printf("Pipe error %s, for child %d \n", strerror(errno), current_child);
+    }
+    close(fds[0]); /* we don't need the read end -- fds[0] */ 
+    return 0;
+}
+
+int open_read_end(int *fds)
+{
+    close(0);  /* close normal stdin (fd = 0) */
+    if( dup2(fds[0], 0)) {    /* make stdin same as fds[0] */
+        printf("Pipe error %s, for child %d \n", strerror(errno), current_child);
+    }
+    close(fds[1]); /* we don't need the write end -- fds[1] */ 
+    return 0;
+}
+
 int spawn_child( void )
 {
     pid_t pid;
-
+    int fds[2]; //For Input and Output redir
 //    current_child++;
     printf("current child = %d\n", current_child);
+    // if thre is a pipe
+    
+    if( num_childs > 1 )    {
+        
+        printf("creating pipe in  = %d\n", current_child);
+        create_pipe(fds);
+        //     and if current child is not the last one in the pipe, create out pipe
+        if( current_child < (num_childs -1))    {
+            open_write_end(fds);
+        }
+        if(  current_child > 0 )    {
+            open_read_end(fds);
+        }
+   }
+      
     pid = fork();
     if( pid < 0 )   {
         printf("Error1 %s \n", strerror(errno));
@@ -182,6 +227,60 @@ int spawn_child( void )
     }
     return 0;
 }
+int spawn_child_itrative( int child )
+{
+    pid_t pid;
+    int fds[2]; //For Input and Output redir
+//    current_child++;
+    printf("Itrative: current child = %d\n", current_child);
+    // if thre is a pipe
+    /*
+    if( num_childs > 1 )    {
+        
+        printf("creating pipe in  = %d\n", current_child);
+        create_pipe(fds);
+        //     and if current child is not the last one in the pipe, create out pipe
+        if( current_child < (num_childs -1))    {
+            open_write_end(fds);
+        }
+        if(  current_child > 0 )    {
+            open_read_end(fds);
+        }
+   }
+      */  
+    pid = fork();
+    if( pid < 0 )   {
+        printf("Error1 %s \n", strerror(errno));
+        exit(1);
+    }
+    if( pid == 0 )  {   //child
+        current_child = child;
+        /*
+        if( current_child < (num_childs - 1))   { // there are more commands in pipe, spawn recursively
+            printf("spawning recursive child. cur child = %d\n", current_child);
+          // current_child++;
+            spawn_child();
+        } else{             // last cmd in pipe
+            printf("last command, %d\n", current_child);
+        */
+            run_exec();
+        /*
+        }
+        */
+    }/*
+    else    {   //parent
+        if( this_is_shell())    {
+            wait(NULL); //shell does not exec itself
+        }
+        else    {
+           // sleep(1);
+            printf("runnig exec for child  %d\n", current_child);
+            run_exec(); // this is a child
+        }
+    }
+    */
+    return 0;
+}
 
 int this_is_shell( void )
 {
@@ -196,6 +295,7 @@ int main(void)
 {
     int child_status = 0;
     pid_t pid;
+    int i = 0;
     memset(inp,0,sizeof(inp));    
     //record the pid of shell before spawining children
     shell_pid = getpid();
@@ -206,7 +306,14 @@ int main(void)
     	split_str( inp, sizeof(inp), inp_tokens, sizeof(inp_tokens)); 
 	    //fillout child process array
 	    fill_child_list();
-        spawn_child();   
+        // spawn_child();   // recursive 
+        for( i = 0; i < num_childs; i++)    {
+            spawn_child_itrative(i);
+        } 
+        for( i = 0; i < num_childs; i++)    {
+            wait(NULL);
+        } 
+
         memset( inp_tokens, 0, sizeof(inp_tokens));
         memset( inp, 0, sizeof(inp));
 

@@ -9,5 +9,5 @@ minishell: minishell.o
 	    gcc msh.o -o msh
 
 clean:
-	    -rm -f msh.o
-		    -rm -f msh
+	-rm -f msh.o
+	-rm -f msh
