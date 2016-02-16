@@ -95,8 +95,10 @@ int run_exec(void)
     //printf(" exec for child %d\n", current_child); 
     //printf(" exec for child --"); 
     memset(argv, 0 , sizeof(argv)); //check this 
-    printf("exec for child %d, cmd_start_index = %d, cmd len = %d\n", current_child, child_list[current_child].cmd_start_index, child_list[current_child].cmd_len);
-    for( i = child_list[current_child].cmd_start_index; i < ( child_list[current_child].cmd_start_index + child_list[current_child].cmd_len); i++)  {
+    printf("exec for child %d, cmd_start_index = %d, cmd len = %d\n", \
+            current_child, child_list[current_child].cmd_start_index, child_list[current_child].cmd_len);
+    for( i = child_list[current_child].cmd_start_index; \
+            i < ( child_list[current_child].cmd_start_index + child_list[current_child].cmd_len); i++)  {
     //for( i = child_list[current_child].cmd_start_index; inp_tokens[i] != NULL;  i++)  {
         if(*inp_tokens[i] == '>')    {
             out_file = inp_tokens[i + 1];
@@ -157,7 +159,7 @@ int run_exec(void)
 int create_pipe( int *fds)
 {
     if ( pipe(fds) == -1) {
-        printf("Pipe error %s, for child %d \n", strerror(errno), current_child);
+        printf("Pipe creation error %s, for child %d \n", strerror(errno), current_child);
         exit(1);
     }
    return 0;
@@ -167,7 +169,7 @@ int open_write_end(int *fds)
 {
     close(1);  /* close normal stdout (fd = 1) */
     if( dup2(fds[1], 1)) {    /* make stdout same as fds[1] */
-        printf("Pipe error %s, for child %d \n", strerror(errno), current_child);
+        printf("Pipe open write end error %s, for child %d \n", strerror(errno), current_child);
     }
     close(fds[0]); /* we don't need the read end -- fds[0] */ 
     return 0;
@@ -177,7 +179,7 @@ int open_read_end(int *fds)
 {
     close(0);  /* close normal stdin (fd = 0) */
     if( dup2(fds[0], 0)) {    /* make stdin same as fds[0] */
-        printf("Pipe error %s, for child %d \n", strerror(errno), current_child);
+        printf("Pipe open read end error %s, for child %d \n", strerror(errno), current_child);
     }
     close(fds[1]); /* we don't need the write end -- fds[1] */ 
     return 0;
@@ -331,6 +333,11 @@ int main(void)
                 }
             }               
             spawn_child_itrative(i);
+            if( child_list[i].pipe_in )
+                close(child_list[i-1].fds[0]);
+            if( child_list[i].pipe_out )
+                close(child_list[i].fds[1]);
+
         } 
         for( i = 0; i < num_childs; i++)    {
             //printf(" child finished %d\n", wait(NULL));
