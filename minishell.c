@@ -255,18 +255,20 @@ void execute_fg(char* job_id){
     
     kill(job_to_resume->pid, SIGCONT);
     wait_for_child(job_to_resume->pid);
-    tcsetpgrp (STDIN_FILENO, getpid());
-    printf("wait returned\n");
+    //tcsetpgrp (STDIN_FILENO, getpid());
+    //printf("wait returned\n");
 
 }
 //checks for exit, jobs, fg and cd command
 int check_and_handle_bash_cmd(char* inp){
     //tokenize input
     char *argv[ARGS_MAX];
-    char *inp_copy = calloc(strlen(inp),1);
+    //char *inp_copy = calloc(strlen(inp),1);
+    char inp_copy[INP_SIZE_MAX];
+   memset( inp_copy, 0 , sizeof(inp_copy)); 
     memcpy(inp_copy,inp,strlen(inp));
     split_str( inp_copy, INP_SIZE_MAX, argv, ARGS_MAX);
-printf("checking for bash: %s\n", argv[0]);  
+//printf("checking for bash: %s\n", argv[0]);  
     if(argv[0] == NULL)
         return 0;
     else{
@@ -292,7 +294,7 @@ printf("checking for bash: %s\n", argv[0]);
             return 0;
         }
     }
-    free(inp_copy);  
+    //free(inp_copy);  
     return 0;
 }
 
@@ -353,7 +355,7 @@ int fill_child_list( void )
     child_list[j].cmd_start_index = 0;
     child_list[j].cmd_len = 1;
     for( i = 1; inp_tokens[i] != NULL; i++) {
-        printf("found token :%s:\n", inp_tokens[i]);
+        //printf("found token :%s:\n", inp_tokens[i]);
         if( *inp_tokens[i] == '|')  {
             j++;
             child_list[j].cmd_start_index = i + 1;
@@ -363,7 +365,7 @@ int fill_child_list( void )
         }
     }
     num_childs = j+1;
-    printf("total number of childs = %d\n",num_childs);
+    //printf("total number of childs = %d\n",num_childs);
     return 0;	
 }
 
@@ -381,7 +383,7 @@ int run_exec(void)
     //printf(" exec for child %d\n", current_child); 
     //printf(" exec for child --"); 
     memset(argv, 0 , sizeof(argv)); //check this 
-    printf("exec for child %d, cmd_start_index = %d, cmd len = %d\n", \
+    //printf("exec for child %d, cmd_start_index = %d, cmd len = %d\n", \
             current_child, child_list[current_child].cmd_start_index, child_list[current_child].cmd_len);
     for( i = child_list[current_child].cmd_start_index; \
             i < ( child_list[current_child].cmd_start_index + child_list[current_child].cmd_len); i++)  {
@@ -396,7 +398,7 @@ int run_exec(void)
         }
         else    {
             argv[j++] = inp_tokens[i];
-            printf("inp_tokens[%d] = %s \n",i,  inp_tokens[i]);
+           // printf("inp_tokens[%d] = %s \n",i,  inp_tokens[i]);
         }
        // printf("1HERE \n");
     }
@@ -427,7 +429,7 @@ int run_exec(void)
        close(out_fd);
       //fprintf(stderr, "OUTPUT!!!!\n");
     }
-
+/*
     printf("Running:\n");
     int k = 0;
     while( argv[k] != NULL ){
@@ -435,7 +437,7 @@ int run_exec(void)
         k++;
     }
     printf("\n");
-
+*/
     if( execvp(argv[0], argv) < 0 )  {
         printf("Error %s for cmd %s\n", strerror(errno), argv[0]);
         exit(0); //Experimental
@@ -477,12 +479,12 @@ int spawn_child( void )
     pid_t pid;
     int fds[2]; //For Input and Output redir
 //    current_child++;
-    printf("current child = %d\n", current_child);
+   // printf("current child = %d\n", current_child);
     // if thre is a pipe
     
     if( num_childs > 1 )    {
         
-        printf("creating pipe in  = %d\n", current_child);
+       // printf("creating pipe in  = %d\n", current_child);
         create_pipe(fds);
         //     and if current child is not the last one in the pipe, create out pipe
         if( current_child < (num_childs -1))    {
@@ -505,7 +507,7 @@ int spawn_child( void )
           // current_child++;
             spawn_child();
         } else{             // last cmd in pipe
-            printf("last command, %d\n", current_child);
+           // printf("last command, %d\n", current_child);
             run_exec();
         }
     }
@@ -525,7 +527,7 @@ int spawn_child_itrative( int child )
 {
     pid_t pid;
     int fds[2]; //For Input and Output redir
-    printf("Itrative: child = %d\n", child);
+    //printf("Itrative: child = %d\n", child);
     pid = fork();
     if( pid < 0 )   {
         printf("Error1 %s \n", strerror(errno));
@@ -571,12 +573,22 @@ int main(void)
     int child_status = 0;
     pid_t pid;
     int i = 0;
+    int count = 0;
     memset(inp,0,sizeof(inp));    
     //record the pid of shell before spawining children
     shell_pid = getpid();
     init_shell();
-    while(1)    {
-        printf("msh>");
+    while(1)    {    
+        memset( inp_tokens, 0, sizeof(inp_tokens));
+        memset( inp, 0, sizeof(inp));
+
+        memset( child_list, 0, sizeof(child_list));
+        num_childs = 0;
+
+        current_child = -1;  //index to the child_list[]
+ 
+        printf("msh %d>", count++);
+        fflush(stdin);
         fgets(inp, INP_SIZE_MAX, stdin);
 #ifdef HARDIK_CODE
 
@@ -584,7 +596,7 @@ int main(void)
         memcpy(inp_backup,inp,strlen(inp));
         //handle bash commands
         if(check_and_handle_bash_cmd(inp)){
-		printf(" bash cmd\n");
+		//printf(" bash cmd\n");
             continue;
         }
        is_background = check_if_background(inp);//hardik
@@ -622,16 +634,9 @@ int main(void)
         }
         else{
             wait_for_child(last_started_process);
+            tcsetpgrp(STDIN_FILENO,getpid());
         }
-        tcsetpgrp(STDIN_FILENO,getpid());
         
-        memset( inp_tokens, 0, sizeof(inp_tokens));
-        memset( inp, 0, sizeof(inp));
-
-        memset( child_list, 0, sizeof(child_list));
-        num_childs = 0;
-
-        current_child = -1;  //index to the child_list[]
-    }
+       }
 	return 0;
 }
