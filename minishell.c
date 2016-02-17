@@ -305,7 +305,6 @@ void init_shell(){
     signal (SIGTTOU, SIG_IGN);
 }
 void init_child_process(){
-    setpgid(getpid(), getpid());
     tcsetpgrp (STDIN_FILENO, getpid());
     signal (SIGINT, SIG_DFL);
     signal (SIGQUIT, SIG_DFL);
@@ -439,6 +438,7 @@ int run_exec(void)
 
     if( execvp(argv[0], argv) < 0 )  {
         printf("Error %s for cmd %s\n", strerror(errno), argv[0]);
+        exit(0); //Experimental
     }
     return 0;
 }
@@ -532,6 +532,10 @@ int spawn_child_itrative( int child )
         exit(1);
     }
     if( pid == 0 )  {   //child
+        //if(child == 0 ) {
+          //  setpgid(getpid(), getpid());
+       // }
+        init_child_process();
         current_child = child;
         if(child_list[current_child].pipe_in == TRUE ){
             open_read_end( child_list[current_child - 1].fds);
@@ -540,6 +544,10 @@ int spawn_child_itrative( int child )
             open_write_end( child_list[current_child].fds);
         }
        run_exec();
+    }
+    else {
+       last_started_process = pid;
+
     }    
     return 0;
 }
@@ -561,6 +569,7 @@ int main(void)
     memset(inp,0,sizeof(inp));    
     //record the pid of shell before spawining children
     shell_pid = getpid();
+    init_shell();
     while(1)    {
         printf("msh>");
         fgets(inp, INP_SIZE_MAX, stdin);
@@ -578,9 +587,9 @@ int main(void)
        	//tokanise the cmd line input
     	split_str( inp, sizeof(inp), inp_tokens, sizeof(inp_tokens)); 
 	    //fillout child process array
-       //if( is_background )  {
-       // remove_background_operator(inp_tokens);
-       //} 
+       if( is_background )  {
+        remove_background_operator(inp_tokens);
+       } 
 	    fill_child_list();
         // spawn_child();   // recursive 
         for( i = 0; i < num_childs; i++)    {
@@ -600,9 +609,17 @@ int main(void)
                 close(child_list[i].fds[1]);
 
         } 
-        for( i = 0; i < num_childs; i++)    {
-            printf(" child finished %d\n", wait(NULL));
+        //for( i = 0; i < num_childs; i++)    {
+        //    printf(" child finished %d\n", wait(NULL));
+        //}
+        if(is_background){
+            make_process_background(inp_backup,last_started_process);
         }
+        else{
+            wait_for_child(last_started_process);
+        }
+        tcsetpgrp(STDIN_FILENO,getpid());
+        
         memset( inp_tokens, 0, sizeof(inp_tokens));
         memset( inp, 0, sizeof(inp));
 
