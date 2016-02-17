@@ -29,7 +29,7 @@ static char *background_operator = "&";
 int is_background = 0;
 #endif
 
-
+pid_t group_id; 
 char inp[INP_SIZE_MAX]; //cmd line
 char *inp_tokens[CHILD_PER_CMD_MAX * ARGS_MAX]; // token list of entire command line
 struct child_process {
@@ -532,9 +532,12 @@ int spawn_child_itrative( int child )
         exit(1);
     }
     if( pid == 0 )  {   //child
-        //if(child == 0 ) {
-          //  setpgid(getpid(), getpid());
-       // }
+        if(child == 0 ) {
+            setpgid(getpid(), getpid());
+        }
+        else    {
+            setpgid(0, group_id);
+        }
         init_child_process();
         current_child = child;
         if(child_list[current_child].pipe_in == TRUE ){
@@ -547,7 +550,9 @@ int spawn_child_itrative( int child )
     }
     else {
        last_started_process = pid;
-
+        if( child == 0) {
+            group_id = pid;
+        }
     }    
     return 0;
 }
