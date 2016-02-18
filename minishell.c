@@ -12,6 +12,7 @@
 
 #define INP_SIZE_MAX    1024 //max chars in a cmd
 #define ARGS_MAX 10	// max args per cmd
+#define TOKENS_MAX  INP_SIZE_MAX	// maximum number to tokens in cmd line
 #define CHILD_PER_CMD_MAX 100	//max number of cmds in a pipe
 
 #define HARDIK_CODE
@@ -31,7 +32,7 @@ int is_background = 0;
 
 pid_t group_id; 
 char inp[INP_SIZE_MAX]; //cmd line
-char *inp_tokens[CHILD_PER_CMD_MAX * ARGS_MAX]; // token list of entire command line
+char *inp_tokens[TOKENS_MAX]; // token list of entire command line
 struct child_process {
 	char cmd_start_index; // index of the first token for this cmd in cmd line
 	char cmd_len;	//number of command line arguments for this process( including cmd name)
@@ -186,10 +187,10 @@ int remove_background_operator(char** argv){
     return 0;
 }
 int check_if_background(char* inp){
-    char *argv[ARGS_MAX];
+    char *argv[TOKENS_MAX];
     char *inp_copy = calloc(strlen(inp),1);
     memcpy(inp_copy,inp,strlen(inp));
-    split_str( inp_copy, INP_SIZE_MAX, argv, ARGS_MAX);
+    split_str( inp_copy, INP_SIZE_MAX, argv, TOKENS_MAX  );
     int len = length(argv);
     if(strcmp(argv[len-1],background_operator)==0){
         // printf("background requested yes\n");fflush(stdout);
@@ -262,12 +263,12 @@ void execute_fg(char* job_id){
 //checks for exit, jobs, fg and cd command
 int check_and_handle_bash_cmd(char* inp){
     //tokenize input
-    char *argv[ARGS_MAX];
+    char *argv[TOKENS_MAX];
     //char *inp_copy = calloc(strlen(inp),1);
     char inp_copy[INP_SIZE_MAX];
    memset( inp_copy, 0 , sizeof(inp_copy)); 
     memcpy(inp_copy,inp,strlen(inp));
-    split_str( inp_copy, INP_SIZE_MAX, argv, ARGS_MAX);
+    split_str( inp_copy, INP_SIZE_MAX, argv, TOKENS_MAX);
 //printf("checking for bash: %s\n", argv[0]);  
     if(argv[0] == NULL)
         return 0;
@@ -587,7 +588,7 @@ int main(void)
 
         current_child = -1;  //index to the child_list[]
  
-        printf("msh %d>", count++);
+        printf("msh>");
         fflush(stdin);
         fgets(inp, INP_SIZE_MAX, stdin);
 #ifdef HARDIK_CODE
@@ -610,6 +611,7 @@ int main(void)
 	    fill_child_list();
         // spawn_child();   // recursive 
         for( i = 0; i < num_childs; i++)    {
+            //printf("i = %d", i);
             if( num_childs > 1) {
                 if( i < (num_childs -1)) {
                     child_list[i].pipe_out = TRUE;

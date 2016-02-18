@@ -3,7 +3,7 @@ HEADERS = minishell.h
 default: minishell
 
 minishell.o: minishell.c $(HEADERS)
-	    gcc -c minishell.c -o msh.o
+	    gcc -g -c minishell.c -o msh.o
 
 minishell: minishell.o
 	    gcc msh.o -o msh
