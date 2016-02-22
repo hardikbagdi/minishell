@@ -5,16 +5,16 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <errno.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <signal.h>
 #include "minishell.h"
 
 #define INP_SIZE_MAX    1024 //max chars in a cmd
 #define ARGS_MAX 10	// max args per cmd
 #define TOKENS_MAX  INP_SIZE_MAX	// maximum number to tokens in cmd line
 #define CHILD_PER_CMD_MAX 100	//max number of cmds in a pipe
-
+typedef void Sigfunc(int);
 #define HARDIK_CODE
 
 #ifdef HARDIK_CODE
@@ -204,11 +204,11 @@ int check_if_background(char* inp){
 void wait_for_child(int pid){
     int child_status;
     pid_t pid_returned;
-        tcsetpgrp (STDIN_FILENO,pid);
+      //  tcsetpgrp (STDIN_FILENO,pid);
        //  printf("parent  wait\n");
          pid_returned = waitpid(pid, &child_status, WUNTRACED );
-         //printf("waitpid: %d\n",pid_returned);
-         if(pid == pid_returned && WIFSTOPPED(child_status)){
+         printf("waitpid: %d\n",pid_returned);
+         // if(pid == pid_returned && WIFSTOPPED(child_status)){
                 // printf("Current process stopped \n");fflush(stdout);
             if(search(pid)==NULL)
                 put_into_background(inp_backup,pid_returned);
@@ -298,17 +298,50 @@ int check_and_handle_bash_cmd(char* inp){
     //free(inp_copy);  
     return 0;
 }
+Sigfunc *install_signal_handler(int signo, Sigfunc *handler)
+{
+    struct sigaction act, oact;
 
+    act.sa_handler = handler;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = 0;
+
+    if( signo == SIGALRM ) {
+#ifdef SA_INTERRUPT
+        act.sa_flags |= SA_INTERRUPT;  /* SunOS 4.x */
+#endif
+    } else {
+#ifdef SA_RESTART
+        act.sa_flags |= SA_RESTART;  /* SVR4, 4.4BSD */
+#endif
+    }
+
+    if( sigaction(signo, &act, &oact) < 0 )
+        return (SIG_ERR);
+
+    return(oact.sa_handler);
+}
+void handle_SIGINT(int sig)
+{
+  printf("GOT SIGKILL\n");
+  killpg(group_id,SIGKILL);
+}
+void handle_SIGTSTP(int sig){
+  printf("GOT SIGTSTP\n");
+  killpg(group_id,SIGTSTP);
+}
 void init_shell(){
     setpgid(getpid(), getpid());
-    signal (SIGINT, SIG_IGN);
+    install_signal_handler(SIGINT, handle_SIGINT);
+    //signal (SIGINT, SIG_IGN);
+    install_signal_handler(SIGTSTP,handle_SIGTSTP);
     signal (SIGQUIT, SIG_IGN);
-    signal (SIGTSTP, SIG_IGN);
+    // signal (SIGTSTP, SIG_IGN);
     signal (SIGTTIN, SIG_IGN);
     signal (SIGTTOU, SIG_IGN);
 }
 void init_child_process(){
-    tcsetpgrp (STDIN_FILENO, getpid());
+ //   tcsetpgrp (STDIN_FILENO, getpid());
     signal (SIGINT, SIG_DFL);
     signal (SIGQUIT, SIG_DFL);
     signal (SIGTSTP, SIG_DFL);
@@ -636,7 +669,7 @@ int main(void)
         }
         else{
             wait_for_child(last_started_process);
-            tcsetpgrp(STDIN_FILENO,getpid());
+       //     tcsetpgrp(STDIN_FILENO,getpid());
         }
         
        }
