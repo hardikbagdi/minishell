@@ -29,7 +29,7 @@ char *inp_backup;
 static char *background_operator = "&";
 int is_background = 0;
 #endif
-
+pid_t current_fg_pg_id;
 pid_t group_id; 
 char inp[INP_SIZE_MAX]; //cmd line
 char *inp_tokens[TOKENS_MAX]; // token list of entire command line
@@ -208,7 +208,7 @@ void wait_for_child(int pid){
        //  printf("parent  wait\n");
          pid_returned = waitpid(pid, &child_status, WUNTRACED );
          printf("waitpid: %d\n",pid_returned);
-         // if(pid == pid_returned && WIFSTOPPED(child_status)){
+         if(pid == pid_returned && WIFSTOPPED(child_status)){
                 // printf("Current process stopped \n");fflush(stdout);
             if(search(pid)==NULL)
                 put_into_background(inp_backup,pid_returned);
@@ -253,8 +253,8 @@ void execute_fg(char* job_id){
       return;
     }
     Job* job_to_resume = search_by_index(index);
-    
-    kill(job_to_resume->pid, SIGCONT);
+    current_fg_pg_id = job_to_resume->pid;
+    killpg(job_to_resume->pid, SIGCONT);
     wait_for_child(job_to_resume->pid);
     //tcsetpgrp (STDIN_FILENO, getpid());
     //printf("wait returned\n");
@@ -324,11 +324,12 @@ Sigfunc *install_signal_handler(int signo, Sigfunc *handler)
 void handle_SIGINT(int sig)
 {
   printf("GOT SIGKILL\n");
-  killpg(group_id,SIGKILL);
+  if(current_fg_pg_id!=0)
+    killpg(current_fg_pg_id,SIGKILL);
 }
 void handle_SIGTSTP(int sig){
   printf("GOT SIGTSTP\n");
-  killpg(group_id,SIGTSTP);
+  killpg(current_fg_pg_id,SIGTSTP);
 }
 void init_shell(){
     setpgid(getpid(), getpid());
@@ -588,6 +589,7 @@ int spawn_child_itrative( int child )
        last_started_process = pid;
         if( child == 0) {
             group_id = pid;
+            current_fg_pg_id = pid;
         }
     }    
     return 0;
@@ -618,7 +620,7 @@ int main(void)
 
         memset( child_list, 0, sizeof(child_list));
         num_childs = 0;
-
+        current_fg_pg_id=0;
         current_child = -1;  //index to the child_list[]
  
         printf("msh>");
@@ -671,6 +673,7 @@ int main(void)
             wait_for_child(last_started_process);
        //     tcsetpgrp(STDIN_FILENO,getpid());
         }
+
         
        }
 	return 0;
