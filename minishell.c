@@ -69,7 +69,7 @@ Job* createJob(char* cmd, pid_t pid){
     if ((pos=strchr(cmd_copy, '\n')) != NULL)
         *pos = '\0';
 
-    job->pid = pid;
+    job->pid = getpgid(pid);
     job->cmd = cmd_copy;
     job->next = NULL;
     return job;
@@ -95,7 +95,7 @@ void put_into_background(char* inp_backup, pid_t pid){
 //search by pid if exist. NULL if doesn't exists
 Job* search(pid_t pid_to_search){
     Job* curr = jobs;
-    while(curr!= NULL && curr->pid!=pid_to_search){
+    while(curr!= NULL && curr->pid!=getpgid(pid_to_search)){
         curr = curr->next;
     }
     return curr;
@@ -112,7 +112,7 @@ int removejob(pid_t pid_to_remove){
     if(search(pid_to_remove) == NULL)
         return 0;
     Job* curr = jobs;
-    if(curr->pid == pid_to_remove){
+    if(curr->pid == getpgid(pid_to_remove)){
         Job* temp = jobs;
         jobs = jobs->next;
         --no_of_jobs;
@@ -204,10 +204,10 @@ int check_if_background(char* inp){
 void wait_for_child(int pid){
     int child_status;
     pid_t pid_returned;
-      //  tcsetpgrp (STDIN_FILENO,pid);
-       //  printf("parent  wait\n");
-         pid_returned = waitpid(pid, &child_status, WUNTRACED );
-         printf("waitpid: %d\n",pid_returned);
+       // tcsetpgrp (STDIN_FILENO,pid);
+       // printf("parent  wait\n");
+         pid_returned = waitpid(pid, &child_status, WUNTRACED);
+        // printf("waitpid: %d\n",pid_returned);
          if(pid == pid_returned && WIFSTOPPED(child_status)){
                 // printf("Current process stopped \n");fflush(stdout);
             if(search(pid)==NULL)
@@ -254,9 +254,12 @@ void execute_fg(char* job_id){
     }
     Job* job_to_resume = search_by_index(index);
     current_fg_pg_id = job_to_resume->pid;
-    killpg(job_to_resume->pid, SIGCONT);
-    wait_for_child(job_to_resume->pid);
-    //tcsetpgrp (STDIN_FILENO, getpid());
+    killpg(getpgid(job_to_resume->pid), SIGCONT);
+    //two calls - first to handle SIGCONT and then to actually wait
+
+    wait_for_child(getpgid(job_to_resume->pid));
+    // wait_for_child(getpgid(job_to_resume->pid));
+    //
     //printf("wait returned\n");
 
 }
@@ -323,29 +326,37 @@ Sigfunc *install_signal_handler(int signo, Sigfunc *handler)
 }
 void handle_SIGINT(int sig)
 {
-  printf("GOT SIGKILL\n");
+  printf("GOT SIGKILL: %d\n",current_fg_pg_id);
   if(current_fg_pg_id!=0)
-    killpg(current_fg_pg_id,SIGKILL);
+    killpg(getpgid(current_fg_pg_id),SIGKILL);
 }
 void handle_SIGTSTP(int sig){
-  printf("GOT SIGTSTP\n");
-  killpg(current_fg_pg_id,SIGTSTP);
+  printf("GOT SIGTSTP: %d\n",current_fg_pg_id);
+  if(current_fg_pg_id!=0)
+    killpg(getpgid(current_fg_pg_id),SIGTSTP);
+}
+void handle_SIGCHILD(int sig){
+    printf("got sigchild\n");
 }
 void init_shell(){
-    setpgid(getpid(), getpid());
-    install_signal_handler(SIGINT, handle_SIGINT);
-    //signal (SIGINT, SIG_IGN);
-    install_signal_handler(SIGTSTP,handle_SIGTSTP);
+   setpgid(getpid(), getpid());
     signal (SIGQUIT, SIG_IGN);
-    // signal (SIGTSTP, SIG_IGN);
+    signal (SIGTSTP, SIG_IGN);
+    signal (SIGINT, SIG_IGN);
     signal (SIGTTIN, SIG_IGN);
     signal (SIGTTOU, SIG_IGN);
+     install_signal_handler(SIGINT, handle_SIGINT);
+     // install_signal_handler(SIGCHLD, handle_SIGCHILD);
+    install_signal_handler(SIGTSTP,handle_SIGTSTP);
 }
 void init_child_process(){
  //   tcsetpgrp (STDIN_FILENO, getpid());
+    // install_signal_handler(SIGINT, handle_SIGINT);
     signal (SIGINT, SIG_DFL);
-    signal (SIGQUIT, SIG_DFL);
     signal (SIGTSTP, SIG_DFL);
+    // install_signal_handler(SIGTSTP,handle_SIGTSTP);
+    // signal (SIGINT, SIG_DFL);
+    signal (SIGQUIT, SIG_DFL);
     signal (SIGTTIN, SIG_DFL);
     signal (SIGTTOU, SIG_DFL);
     signal (SIGCHLD, SIG_DFL);
@@ -477,6 +488,7 @@ int run_exec(void)
         printf("Error %s for cmd %s\n", strerror(errno), argv[0]);
         exit(0); //Experimental
     }
+    printf("never print\n");
     return 0;
 }
 
@@ -590,6 +602,10 @@ int spawn_child_itrative( int child )
         if( child == 0) {
             group_id = pid;
             current_fg_pg_id = pid;
+          //  printf("setting fg grp\n" );
+            if(0!=tcsetpgrp(STDIN_FILENO,group_id)){
+            printf("(error in tcsetpgrp)\n");
+           }
         }
     }    
     return 0;
@@ -604,6 +620,10 @@ int this_is_shell( void )
     else
         return FALSE;
 }
+
+
+
+
 int main(void)
 {
     int child_status = 0;
@@ -640,9 +660,9 @@ int main(void)
        	//tokanise the cmd line input
     	split_str( inp, sizeof(inp), inp_tokens, sizeof(inp_tokens)); 
 	    //fillout child process array
-       if( is_background )  {
-        remove_background_operator(inp_tokens);
-       } 
+       // if( is_background )  {
+       //  remove_background_operator(inp_tokens);
+       // } 
 	    fill_child_list();
         // spawn_child();   // recursive 
         for( i = 0; i < num_childs; i++)    {
@@ -670,8 +690,11 @@ int main(void)
             make_process_background(inp_backup,last_started_process);
         }
         else{
+           //waitpid(last_started_process, &child_status, WUNTRACED);
             wait_for_child(last_started_process);
-       //     tcsetpgrp(STDIN_FILENO,getpid());
+           if(0!=tcsetpgrp(STDIN_FILENO,getpid())){
+            printf("(error in tcsetpgrp)\n");
+           }
         }
 
         
