@@ -69,7 +69,7 @@ Job* createJob(char* cmd, pid_t pid){
     if ((pos=strchr(cmd_copy, '\n')) != NULL)
         *pos = '\0';
 
-    job->pid = getpgid(pid);
+    job->pid = pid;
     job->cmd = cmd_copy;
     job->next = NULL;
     return job;
@@ -89,6 +89,7 @@ int addjob(Job* job){
 }
 //wrapper to hold background jobs
 void put_into_background(char* inp_backup, pid_t pid){
+    // printf("from put_into_bk: %d",pid);
     Job *job = createJob(inp_backup,pid);
     addjob(job);
 }
@@ -136,7 +137,7 @@ int removejob(pid_t pid_to_remove){
 
 }
 //removes zombie process from background jobs
-void remove_dead_jobs(){
+void remove_dead_jobs_backup(){
     Job* curr = jobs;
     pid_t pid;
     Job* temp= NULL;
@@ -149,6 +150,20 @@ void remove_dead_jobs(){
         curr = temp;
     }
 }
+void remove_dead_jobs(){
+    Job* curr = jobs;
+    pid_t pid;
+    Job* temp= NULL;
+    while(curr!=NULL){
+        temp = curr->next;
+        pid = waitpid(curr->pid,NULL, WNOHANG);
+        if(pid == curr->pid){
+            removejob(getpgid(curr->pid));
+        }
+        curr = temp;
+    }
+}
+
 //print used for 'jobs' command
 void print_jobs(){
     remove_dead_jobs();
@@ -177,8 +192,9 @@ int length(char** argv){
 }
 
 int make_process_background(char* cmd, pid_t pid){
+    // printf("Back requestd: %d\n",pid );
     put_into_background(cmd,pid);
-    printf("Background process: [%d] %s\n",pid,cmd);
+    //printf("Background process: [%d] %s\n",pid,cmd);
     return 0;
 }
 int remove_background_operator(char** argv){
@@ -215,14 +231,14 @@ void wait_for_child(int pid){
          }
          else if(pid == pid_returned && WIFEXITED(child_status)){
             if(search(pid_returned))
-                removejob(pid_returned);
+                removejob(getpgid(pid_returned));
                 // printf("Current process terminated normally \n");fflush(stdout);
          }
          else if(pid == pid_returned && WIFSIGNALED(child_status)){
-                // printf("Current process terminated on signal \n");fflush(stdout);
+                 // printf("Current process terminated on signal \n");fflush(stdout);
                 // tcsetpgrp (STDIN_FILENO, getpid());
             if(search(pid_returned))
-                removejob(pid_returned);
+                removejob(getpgid(pid_returned));
 
          }
 }
@@ -253,10 +269,14 @@ void execute_fg(char* job_id){
       return;
     }
     Job* job_to_resume = search_by_index(index);
-    current_fg_pg_id = job_to_resume->pid;
-    killpg(getpgid(job_to_resume->pid), SIGCONT);
+    // printf("Pg id to resume:%d\n",job_to_resume->pid );
+    current_fg_pg_id = getpgid(job_to_resume->pid);
+    if(killpg(getpgid(job_to_resume->pid), SIGCONT)){
+        // printf("some error\n" );
+    }
     //two calls - first to handle SIGCONT and then to actually wait
 
+    wait_for_child(getpgid(job_to_resume->pid));
     wait_for_child(getpgid(job_to_resume->pid));
     // wait_for_child(getpgid(job_to_resume->pid));
     //
@@ -329,6 +349,8 @@ void handle_SIGINT(int sig)
   printf("GOT SIGKILL: %d\n",current_fg_pg_id);
   if(current_fg_pg_id!=0)
     killpg(getpgid(current_fg_pg_id),SIGKILL);
+  if(search(current_fg_pg_id))
+    removejob(getpgid(current_fg_pg_id));
 }
 void handle_SIGTSTP(int sig){
   printf("GOT SIGTSTP: %d\n",current_fg_pg_id);
@@ -660,9 +682,9 @@ int main(void)
        	//tokanise the cmd line input
     	split_str( inp, sizeof(inp), inp_tokens, sizeof(inp_tokens)); 
 	    //fillout child process array
-       // if( is_background )  {
-       //  remove_background_operator(inp_tokens);
-       // } 
+       if( is_background )  {
+        remove_background_operator(inp_tokens);
+       } 
 	    fill_child_list();
         // spawn_child();   // recursive 
         for( i = 0; i < num_childs; i++)    {
@@ -686,8 +708,9 @@ int main(void)
         //for( i = 0; i < num_childs; i++)    {
         //    printf(" child finished %d\n", wait(NULL));
         //}
+        // printf("Current fg pgid: %d\n",current_fg_pg_id );
         if(is_background){
-            make_process_background(inp_backup,last_started_process);
+            make_process_background(inp_backup,current_fg_pg_id);
         }
         else{
            //waitpid(last_started_process, &child_status, WUNTRACED);
