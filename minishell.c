@@ -223,7 +223,7 @@ void wait_for_child(int pid){
        // tcsetpgrp (STDIN_FILENO,pid);
        // printf("parent  wait\n");
          pid_returned = waitpid(pid, &child_status, WUNTRACED);
-        // printf("waitpid: %d\n",pid_returned);
+       // printf("waitpid: %d\n",pid_returned);
          if(pid == pid_returned && WIFSTOPPED(child_status)){
                 // printf("Current process stopped \n");fflush(stdout);
             if(search(pid)==NULL)
@@ -277,7 +277,7 @@ void execute_fg(char* job_id){
     //two calls - first to handle SIGCONT and then to actually wait
 
     wait_for_child(getpgid(job_to_resume->pid));
-    wait_for_child(getpgid(job_to_resume->pid));
+    // wait_for_child(getpgid(job_to_resume->pid));
     // wait_for_child(getpgid(job_to_resume->pid));
     //
     //printf("wait returned\n");
@@ -346,19 +346,20 @@ Sigfunc *install_signal_handler(int signo, Sigfunc *handler)
 }
 void handle_SIGINT(int sig)
 {
-  printf("GOT SIGKILL: %d\n",current_fg_pg_id);
+ // printf("GOT SIGKILL: %d\n",current_fg_pg_id);
   if(current_fg_pg_id!=0)
     killpg(getpgid(current_fg_pg_id),SIGKILL);
   if(search(current_fg_pg_id))
     removejob(getpgid(current_fg_pg_id));
 }
 void handle_SIGTSTP(int sig){
-  printf("GOT SIGTSTP: %d\n",current_fg_pg_id);
+  //printf("GOT SIGTSTP: %d\n",current_fg_pg_id);
   if(current_fg_pg_id!=0)
-    killpg(getpgid(current_fg_pg_id),SIGTSTP);
+    killpg(current_fg_pg_id,SIGTSTP);
+       // printf("killpg in SIGTSTP handler failed\n" );
 }
 void handle_SIGCHILD(int sig){
-    printf("got sigchild\n");
+ //   printf("got sigchild\n");
 }
 void init_shell(){
    setpgid(getpid(), getpid());
